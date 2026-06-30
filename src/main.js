@@ -11,12 +11,13 @@ import {
   buildSelectLayout, hitSelect, drawTitle, drawSelect, drawResult, PICK_COLORS,
 } from "./ui.js";
 import { randInt } from "./utils.js";
+import { preloadSprites, spritesReady, loadProgress, allSprites } from "./sprites.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const game = {
-  state: "title", // title | select | fight | result
+  state: "loading", // loading | title | select | fight | result
   tick: 0,
   layout: buildSelectLayout(),
   sel: {
@@ -45,6 +46,7 @@ window.addEventListener("keydown", resumeAudio, { once: true });
 function logicStep() {
   game.tick++;
   switch (game.state) {
+    case "loading": stepLoading(); break;
     case "title": stepTitle(); break;
     case "select": stepSelect(); break;
     case "fight": stepFight(); break;
@@ -52,6 +54,10 @@ function logicStep() {
   }
   Input.endFrame();
   Pointer.clicked = false;
+}
+
+function stepLoading() {
+  if (spritesReady()) game.state = "title";
 }
 
 function stepTitle() {
@@ -163,11 +169,28 @@ function stepResult() {
 function render() {
   ctx.clearRect(0, 0, GAME.width, GAME.height);
   switch (game.state) {
+    case "loading": drawLoading(); break;
     case "title": drawTitle(ctx, game.tick); break;
     case "select": drawSelect(ctx, game.sel, game.layout, Pointer); break;
     case "fight": renderFight(); break;
     case "result": renderFight(); drawResult(ctx, game.match, game.tick); break;
   }
+}
+
+function drawLoading() {
+  const g = ctx.createLinearGradient(0, 0, 0, GAME.height);
+  g.addColorStop(0, "#241d3a"); g.addColorStop(1, "#0e0b18");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, GAME.width, GAME.height);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+  ctx.font = "bold 40px system-ui, sans-serif";
+  ctx.fillText("MBTI FIGHTS", GAME.width / 2, GAME.height / 2 - 40);
+  ctx.font = "18px system-ui, sans-serif";
+  ctx.fillStyle = "#c9b6ff";
+  ctx.fillText("加载角色中… Loading fighters", GAME.width / 2, GAME.height / 2);
+  const bw = 360, bx = (GAME.width - bw) / 2, by = GAME.height / 2 + 24;
+  ctx.fillStyle = "#222230"; ctx.fillRect(bx, by, bw, 12);
+  ctx.fillStyle = "#7df9ff"; ctx.fillRect(bx, by, bw * loadProgress(), 12);
+  ctx.textAlign = "left";
 }
 
 function renderFight() {
@@ -203,5 +226,7 @@ function frame(now) {
 
 // expose a tiny bit of state for smoke tests
 window.__mbti = game;
+window.__sprites = allSprites();
 
+preloadSprites();
 requestAnimationFrame(frame);

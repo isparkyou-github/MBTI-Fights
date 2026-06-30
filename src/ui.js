@@ -3,6 +3,7 @@
 
 import { GAME } from "./config.js";
 import { CHARACTERS, TYPES, CATEGORIES, FAMILY_ORDER } from "./characters.js";
+import { getSprite } from "./sprites.js";
 
 const W = GAME.width, H = GAME.height;
 export const PICK_COLORS = { p1: "#ffd24a", p2: "#7df9ff" };
@@ -86,6 +87,16 @@ export function drawMiniFighter(ctx, ch, cx, baseY, scale) {
   ctx.restore();
 }
 
+// Draw a character's sprite fitted into a box, anchored bottom-centre.
+// Falls back to the procedural mini fighter if the sprite isn't loaded yet.
+export function drawCharSprite(ctx, ch, cx, baseY, maxW, maxH) {
+  const img = getSprite(ch.id);
+  if (!img || !img.width) { drawMiniFighter(ctx, ch, cx, baseY, maxH / 150); return; }
+  const scale = Math.min(maxH / img.height, maxW / img.width);
+  const dw = img.width * scale, dh = img.height * scale;
+  ctx.drawImage(img, cx - dw / 2, baseY - dh, dw, dh);
+}
+
 function seg(ctx, x1, y1, x2, y2, w1, w2, color) {
   const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len, ny = dx / len;
@@ -133,9 +144,9 @@ export function drawTitle(ctx, t) {
   g.addColorStop(0, "#241d3a"); g.addColorStop(1, "#0e0b18");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-  // decorative fighters
-  drawMiniFighter(ctx, CHARACTERS[4], W / 2 - 150, 380, 2.2);  // ENTJ M (purple)
-  drawMiniFighter(ctx, CHARACTERS[29], W / 2 + 150, 380, 2.2); // ESTP F (yellow)
+  // decorative fighters (sprite art)
+  drawCharSprite(ctx, CHARACTERS[4], W / 2 - 185, 500, 230, 330);  // ENTJ male
+  drawCharSprite(ctx, CHARACTERS[29], W / 2 + 185, 500, 230, 330); // ESTP female
 
   ctx.textAlign = "center";
   ctx.fillStyle = "#fff";
@@ -191,7 +202,7 @@ export function drawSelect(ctx, state, layout, pointer) {
     ctx.fill();
     ctx.strokeStyle = cat.colors.dark; ctx.lineWidth = 1; ctx.stroke();
 
-    drawMiniFighter(ctx, ch, cell.x + cell.w / 2, cell.y + cell.h - 16, 0.46);
+    drawCharSprite(ctx, ch, cell.x + cell.w / 2, cell.y + cell.h - 6, cell.w - 8, cell.h - 24);
 
     ctx.fillStyle = "#eee";
     ctx.font = "bold 11px system-ui, sans-serif";

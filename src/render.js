@@ -3,6 +3,7 @@
 
 import { GAME, ARENA, FIGHTER, ROUND } from "./config.js";
 import { SPECIAL_METER_COST } from "./specials.js";
+import { getSprite } from "./sprites.js";
 
 // ---------- low-level shapes ----------
 function seg(ctx, x1, y1, x2, y2, w1, w2, color) {
@@ -156,104 +157,78 @@ export function drawFighter(ctx, f) {
   ctx.fill();
   ctx.restore();
 
-  const pose = poseFor(f);
-
-  ctx.save();
-  ctx.translate(f.x, f.y + pose.bob);
-  ctx.scale(f.facing, 1); // forward = +x
-
-  if (f.state === "ko") {
-    ctx.rotate(-1.25);
-    ctx.translate(-10, 18);
-  }
-
-  // glow aura
-  if (pose.glow) {
-    const g = ctx.createRadialGradient(0, -70, 6, 0, -70, 78);
-    g.addColorStop(0, pose.glow + "cc");
-    g.addColorStop(1, pose.glow + "00");
+  // glow aura (special cast, or active buff / heal)
+  const glow = f.state === "special" ? c.accent
+    : (f.buffs.timer > 0 || f.heal.remaining > 0) ? c.light : null;
+  if (glow) {
+    const pulse = 72 + Math.sin(f.animTime * 0.3) * 8;
+    const g = ctx.createRadialGradient(f.x, f.y - 80, 6, f.x, f.y - 80, pulse);
+    g.addColorStop(0, glow + "bb");
+    g.addColorStop(1, glow + "00");
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(0, -70, 78, 0, Math.PI * 2);
+    ctx.arc(f.x, f.y - 80, pulse, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // proportions
-  const hipY = -60, shoulderY = -112, headY = -134, headR = 14;
-  const shoulderX = female ? 13 : 18;
-  const legW = 8, armW = 6;
-  const thigh = 30, shin = 30, upper = 25, fore = 23;
+  const img = getSprite(f.character.id);
+  if (!img || !img.width) { drawFallback(ctx, f, c); return; }
 
-  const lean = pose.lean;
-  const sx = Math.sin(lean) * 40; // shoulder x shift from lean
-  const sShoulderY = shoulderY;
+  // fit the sprite into a uniform display box (height-led, width-capped)
+  const DH = 172, MAXW = 132;
+  const scale = Math.min(DH / img.height, MAXW / img.width);
+  const dw = img.width * scale, dh = img.height * scale;
 
-  // ---- back limbs (darker, drawn first) ----
-  limb(ctx, -4, hipY, pose.backLeg[0], thigh, pose.backLeg[1], shin, legW, c.dark);
-  limb(ctx, -shoulderX * 0.3 + sx, sShoulderY, pose.backArm[0], upper, pose.backArm[1], fore, armW, c.dark);
-
-  // ---- torso ----
-  const hipHalf = 12;
-  poly(ctx, [
-    [-hipHalf, hipY],
-    [hipHalf, hipY],
-    [shoulderX + sx, sShoulderY],
-    [-shoulderX + sx, sShoulderY],
-  ], c.main);
-  // chest facet (lighter front)
-  poly(ctx, [
-    [0, hipY],
-    [hipHalf, hipY],
-    [shoulderX + sx, sShoulderY],
-    [sx, sShoulderY],
-  ], c.light);
-  // female skirt
-  if (female) {
-    poly(ctx, [
-      [-hipHalf - 5, hipY + 14],
-      [hipHalf + 5, hipY + 14],
-      [hipHalf, hipY - 6],
-      [-hipHalf, hipY - 6],
-    ], c.dark);
+  // per-state animation (transforms only — art is a single portrait)
+  const t = f.animTime;
+  let vbob = 0, fwd = 0, rot = 0, sclX = 1, sclY = 1;
+  switch (f.state) {
+    case "walk": vbob = -Math.abs(Math.sin(t * 0.35)) * 5; break;
+    case "jump": sclX = 0.98; sclY = 1.04; break;
+    case "block": rot = -0.06; sclY = 0.96; vbob = 4; break;
+    case "hitstun": rot = -0.2; break;
+    case "ko": rot = -1.32; break;
+    case "attack": {
+      const m = f.move, tt = f.moveTimer;
+      let p = 0;
+      if (m) {
+        if (tt <= m.startup) p = -(tt / m.startup) * 0.4;
+        else if (tt <= m.startup + m.active) p = 1;
+        else p = Math.max(0, 1 - (tt - m.startup - m.active) / m.recovery);
+      }
+      fwd = p * 14;
+      sclX = 1 + Math.max(0, p) * 0.05;
+      sclY = 1 - Math.max(0, p) * 0.03;
+      break;
+    }
+    case "special":
+      fwd = (f.special && f.special.dashVx) ? 6 : 3;
+      sclX = 1 + Math.sin(t * 0.5) * 0.02;
+      break;
+    default: vbob = Math.sin(t * 0.1) * 2; // idle breathing
   }
-  // belt accent
-  seg(ctx, -hipHalf, hipY, hipHalf, hipY, 3, 3, c.accent);
 
-  // ---- head ----
-  const hx = sx * 1.1;
-  poly(ctx, [
-    [hx - headR, headY + headR],
-    [hx - headR + 3, headY - headR],
-    [hx + headR - 3, headY - headR],
-    [hx + headR, headY + headR],
-    [hx + 4, headY + headR + 6],
-    [hx - 4, headY + headR + 6],
-  ], c.skin);
-  // hair
-  if (female) {
-    poly(ctx, [
-      [hx - headR - 2, headY - headR + 2],
-      [hx + headR, headY - headR - 3],
-      [hx + headR, headY - 2],
-      [hx - headR - 4, headY + 18],
-      [hx - headR - 2, headY + 2],
-    ], c.dark);
-  }
-  poly(ctx, [
-    [hx - headR, headY - headR + 4],
-    [hx - headR + 2, headY - headR - 2],
-    [hx + headR - 2, headY - headR - 2],
-    [hx + headR, headY - headR + 5],
-  ], c.dark);
-  // visor / eye accent on the forward face
-  seg(ctx, hx + 2, headY, hx + headR, headY, 2.5, 2.5, c.accent);
-  dot(ctx, hx + headR - 4, headY, 1.8, "#1a1a1a");
+  const flashing = (f.hitFlash > 0 || f.armorFlash > 0) && Math.floor(t) % 2 === 0;
 
-  // ---- front limbs (main color, drawn last) ----
-  limb(ctx, 4, hipY, pose.frontLeg[0], thigh, pose.frontLeg[1], shin, legW, c.main);
-  const hand = limb(ctx, shoulderX * 0.3 + sx, sShoulderY, pose.frontArm[0], upper, pose.frontArm[1], fore, armW, c.main);
-  dot(ctx, hand.x, hand.y, armW * 0.8, c.light);
+  ctx.save();
+  ctx.translate(f.x, f.y + vbob);
+  ctx.scale(f.facing, 1);   // forward = +x
+  ctx.translate(fwd, 0);
+  if (rot) ctx.rotate(rot);
+  ctx.scale(sclX, sclY);
+  if (flashing) ctx.globalAlpha = 0.55;
+  ctx.drawImage(img, -dw / 2, -dh, dw, dh);
+  ctx.restore();
+}
 
+// Simple colored stand-in if a sprite failed to load.
+function drawFallback(ctx, f, c) {
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.fillStyle = c.main;
+  ctx.fillRect(-22, -150, 44, 150);
+  ctx.fillStyle = c.skin;
+  ctx.beginPath(); ctx.arc(0, -160, 16, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 

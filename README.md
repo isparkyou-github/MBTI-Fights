@@ -6,12 +6,17 @@ from **32 fighters** (16 types × male/female), grouped into the four
 a **unique special (大招) for every personality type**.
 
 - **Pure vanilla JS + HTML5 Canvas.** No dependencies, no build step.
-- **Original procedural low-poly art** — every fighter, stage, effect and the UI
-  is drawn in code (the real 16Personalities artwork is copyrighted, so this is a
-  fresh recreation of the angular look and the family color coding).
+- **Custom anime-style character art** — a single source grid
+  (`assets/mbti-characters.png`) is sliced into 32 transparent sprites by
+  `tools/slice_sprites.py`. The fighters are animated with canvas transforms
+  (bob / hop / lunge / tilt / KO tumble). Stage, effects, and HUD are drawn in code.
 - **Two modes:** single player vs CPU, or two players on one keyboard.
 
-## Run it
+## Play online
+
+Hosted on GitHub Pages: **https://isparkyou-github.github.io/MBTI-Fights/**
+
+## Run it locally
 
 ES modules need to be served over HTTP (not opened as a `file://`). From the
 project folder:
@@ -72,7 +77,11 @@ The 大招 needs a full super meter (it fills as you deal and take damage). In
 
 ```
 index.html / styles.css        page shell + canvas
-src/main.js                    state machine (TITLE→SELECT→FIGHT→RESULT) + loop
+assets/mbti-characters.png     source art grid (32 characters)
+assets/sprites/<ID>.png         sliced transparent sprites (e.g. INTJ_M.png)
+tools/slice_sprites.py         regenerates the sprites from the source grid
+src/sprites.js                 preloads the 32 sprites
+src/main.js                    state machine (LOADING→TITLE→SELECT→FIGHT→RESULT) + loop
 src/config.js                  tunables: physics, damage table, controls
 src/characters.js              16 types → 32 fighters, family palettes
 src/specials.js                the 16 大招 definitions
