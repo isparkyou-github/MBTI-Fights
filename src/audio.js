@@ -2,6 +2,10 @@
 
 let ctx = null;
 let enabled = true;
+let muted = false;
+
+export function setMuted(m) { muted = m; }
+export function isMuted() { return muted; }
 
 function ac() {
   if (ctx) return ctx;
@@ -20,7 +24,7 @@ export function resumeAudio() {
 }
 
 function blip(freq, dur, type = "square", gain = 0.06) {
-  if (!enabled) return;
+  if (!enabled || muted) return;
   const c = ac();
   if (!c) return;
   const o = c.createOscillator();

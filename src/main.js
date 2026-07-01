@@ -5,10 +5,11 @@ import { GAME, CONTROLS } from "./config.js";
 import { Input, Pointer } from "./input.js";
 import { CHARACTERS } from "./characters.js";
 import { Match } from "./match.js";
-import { resumeAudio, Sfx } from "./audio.js";
+import { resumeAudio, Sfx, setMuted, isMuted } from "./audio.js";
 import { drawArena, drawFighter, drawProjectiles, drawParticles, drawHUD, drawPlayerMarker } from "./render.js";
 import {
   buildSelectLayout, hitSelect, drawTitle, drawSelect, drawResult, PICK_COLORS,
+  titleHit, drawHowto, howtoHit, drawPauseMenu, pauseHit, drawSettings, settingsHit,
 } from "./ui.js";
 import { randInt } from "./utils.js";
 import { preloadSprites, spritesReady, loadProgress, allSprites } from "./sprites.js";
@@ -17,7 +18,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const game = {
-  state: "loading", // loading | title | select | fight | result
+  state: "loading", // loading | title | howto | select | fight | result
   tick: 0,
   layout: buildSelectLayout(),
   sel: {
@@ -26,6 +27,8 @@ const game = {
   },
   p1char: null, p2char: null,
   match: null,
+  paused: false,
+  pauseView: "menu", // menu | settings
 };
 
 // ---------- pointer ----------
@@ -48,6 +51,7 @@ function logicStep() {
   switch (game.state) {
     case "loading": stepLoading(); break;
     case "title": stepTitle(); break;
+    case "howto": stepHowto(); break;
     case "select": stepSelect(); break;
     case "fight": stepFight(); break;
     case "result": stepResult(); break;
@@ -61,9 +65,23 @@ function stepLoading() {
 }
 
 function stepTitle() {
-  if (Input.wasPressed("Enter") || Input.wasPressed("Space") || Pointer.clicked) {
+  if (Pointer.clicked) {
+    const h = titleHit(Pointer.x, Pointer.y);
+    if (h === "start") { Sfx.select(); game.state = "select"; return; }
+    if (h === "howto") { Sfx.select(); game.state = "howto"; return; }
+  }
+  if (Input.wasPressed("KeyH")) { Sfx.select(); game.state = "howto"; return; }
+  if (Input.wasPressed("Enter") || Input.wasPressed("Space")) {
     Sfx.select();
     game.state = "select";
+  }
+}
+
+function stepHowto() {
+  if (Input.wasPressed("Escape") || Input.wasPressed("Backspace") || Input.wasPressed("Enter") ||
+      (Pointer.clicked && howtoHit(Pointer.x, Pointer.y))) {
+    Sfx.select();
+    game.state = "title";
   }
 }
 
@@ -125,6 +143,8 @@ function startFight() {
   game.p1char = CHARACTERS[game.sel.p1];
   game.p2char = CHARACTERS[game.sel.p2];
   game.match = new Match(game.p1char, game.p2char, game.sel.mode);
+  game.paused = false;
+  game.pauseView = "menu";
   game.state = "fight";
   Sfx.select();
 }
@@ -145,6 +165,13 @@ function humanIntent(map) {
 
 function stepFight() {
   const m = game.match;
+  if (game.paused) { stepPause(); return; }
+  if (!m.over && (Input.wasPressed("Escape") || Input.wasPressed("KeyP"))) {
+    game.paused = true;
+    game.pauseView = "menu";
+    Sfx.select();
+    return;
+  }
   const intents = {
     p1: humanIntent(CONTROLS.p1),
     p2: m.mode === "2p" ? humanIntent(CONTROLS.p2) : null,
@@ -153,11 +180,36 @@ function stepFight() {
   if (m.over && m.endTimer > 90) game.state = "result";
 }
 
+function stepPause() {
+  if (game.pauseView === "settings") {
+    if (Input.wasPressed("Escape") || Input.wasPressed("Backspace")) { game.pauseView = "menu"; return; }
+    if (Pointer.clicked) {
+      const h = settingsHit(Pointer.x, Pointer.y);
+      if (h === "sound") { setMuted(!isMuted()); if (!isMuted()) Sfx.select(); }
+      else if (h === "back") { Sfx.select(); game.pauseView = "menu"; }
+    }
+    return;
+  }
+  // pause menu
+  if (Input.wasPressed("Escape") || Input.wasPressed("KeyP") || Input.wasPressed("Enter")) {
+    game.paused = false;
+    return;
+  }
+  if (Pointer.clicked) {
+    const h = pauseHit(Pointer.x, Pointer.y);
+    if (h === "resume") { Sfx.select(); game.paused = false; }
+    else if (h === "settings") { Sfx.select(); game.pauseView = "settings"; }
+    else if (h === "quit") { Sfx.select(); game.paused = false; game.state = "title"; }
+  }
+}
+
 function stepResult() {
   // keep the scene settling
   game.match.step({ p1: null, p2: null });
   if (Input.wasPressed("Enter") || Pointer.clicked) {
     game.match = new Match(game.p1char, game.p2char, game.sel.mode);
+    game.paused = false;
+    game.pauseView = "menu";
     game.state = "fight";
     Sfx.select();
   } else if (Input.wasPressed("Backspace")) {
@@ -171,8 +223,15 @@ function render() {
   switch (game.state) {
     case "loading": drawLoading(); break;
     case "title": drawTitle(ctx, game.tick); break;
+    case "howto": drawHowto(ctx); break;
     case "select": drawSelect(ctx, game.sel, game.layout, Pointer); break;
-    case "fight": renderFight(); break;
+    case "fight":
+      renderFight();
+      if (game.paused) {
+        if (game.pauseView === "settings") drawSettings(ctx, !isMuted());
+        else drawPauseMenu(ctx);
+      }
+      break;
     case "result": renderFight(); drawResult(ctx, game.match, game.tick); break;
   }
 }
@@ -204,6 +263,14 @@ function renderFight() {
   drawProjectiles(ctx, m);
   drawParticles(ctx, m);
   drawHUD(ctx, m);
+  if (!m.over) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Esc / P 暂停", GAME.width / 2, GAME.height - 10);
+    ctx.restore();
+  }
 }
 
 // ---------- loop ----------

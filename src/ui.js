@@ -145,8 +145,8 @@ export function drawTitle(ctx, t) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   // decorative fighters (sprite art)
-  drawCharSprite(ctx, CHARACTERS[4], W / 2 - 185, 500, 230, 330);  // ENTJ male
-  drawCharSprite(ctx, CHARACTERS[29], W / 2 + 185, 500, 230, 330); // ESTP female
+  drawCharSprite(ctx, CHARACTERS[4], W / 2 - 255, 508, 180, 300);  // ENTJ male
+  drawCharSprite(ctx, CHARACTERS[29], W / 2 + 255, 508, 180, 300); // ESTP female
 
   ctx.textAlign = "center";
   ctx.fillStyle = "#fff";
@@ -156,14 +156,19 @@ export function drawTitle(ctx, t) {
   ctx.fillStyle = "#c9b6ff";
   ctx.fillText("16型人格 2D 格斗", W / 2, 195);
 
+  // buttons
+  button(ctx, TITLE_START, "开始 START ▶", true);
+  button(ctx, TITLE_HOWTO, "操作教程 HOW TO", false);
   if (Math.floor(t / 30) % 2 === 0) {
-    ctx.fillStyle = "#fff";
-    ctx.font = "20px system-ui, sans-serif";
-    ctx.fillText("点击 / 按 Enter 开始", W / 2, 470);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Enter 开始  ·  H 教程", W / 2, 496);
   }
   ctx.font = "13px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText("原创低多边形美术 · 角色灵感来自16型人格", W / 2, 510);
+  ctx.textAlign = "center";
+  ctx.fillText("原创动漫风格美术 · 角色灵感来自16型人格", W / 2, 524);
   ctx.textAlign = "left";
 }
 
@@ -289,5 +294,107 @@ export function drawResult(ctx, match, t) {
     ctx.font = "20px system-ui, sans-serif";
     ctx.fillText("Enter 再战  ·  Backspace 重新选择", W / 2, H / 2 + 80);
   }
+  ctx.textAlign = "left";
+}
+
+// ---------- title buttons ----------
+const TITLE_START = { x: W / 2 - 210, y: 246, w: 200, h: 54 };
+const TITLE_HOWTO = { x: W / 2 + 10, y: 246, w: 200, h: 54 };
+export function titleHit(x, y) {
+  if (inside(TITLE_START, x, y)) return "start";
+  if (inside(TITLE_HOWTO, x, y)) return "howto";
+  return null;
+}
+
+// ---------- how to play ----------
+const HOWTO_BACK = { x: W / 2 - 90, y: H - 50, w: 180, h: 38 };
+export function howtoHit(x, y) { return inside(HOWTO_BACK, x, y) ? "back" : null; }
+
+export function drawHowto(ctx) {
+  ctx.fillStyle = "#16121f"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#fff";
+  ctx.font = "bold 30px system-ui, sans-serif";
+  ctx.fillText("操作教程 HOW TO PLAY", W / 2, 48);
+
+  const rows = [
+    ["动作 Action", "玩家1 P1", "玩家2 P2"],
+    ["移动 Move", "A / D", "← / →"],
+    ["跳 Jump", "W", "↑"],
+    ["防御 Block (按住)", "S", "↓"],
+    ["小拳 Light punch", "F", "J"],
+    ["大拳 Heavy punch", "G", "K"],
+    ["小脚 Light kick", "C", "N"],
+    ["大脚 Heavy kick", "V", "M"],
+    ["大招 Special", "R", "U"],
+    ["暂停 Pause", "Esc / P", "Esc / P"],
+  ];
+  const actionX = 210, p1X = 560, p2X = 730, y0 = 82, rh = 27;
+  for (let i = 0; i < rows.length; i++) {
+    const y = y0 + i * rh;
+    if (i === 0) { ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(190, y - 20, 600, 26); }
+    ctx.fillStyle = i === 0 ? "#c9b6ff" : "#eee";
+    ctx.font = (i === 0 ? "bold " : "") + "16px system-ui, sans-serif";
+    ctx.textAlign = "left"; ctx.fillText(rows[i][0], actionX, y);
+    ctx.textAlign = "center"; ctx.fillText(rows[i][1], p1X, y);
+    ctx.fillText(rows[i][2], p2X, y);
+  }
+
+  const ty = y0 + rows.length * rh + 16;
+  ctx.textAlign = "center"; ctx.fillStyle = "#c9b6ff";
+  ctx.font = "bold 16px system-ui, sans-serif";
+  ctx.fillText("玩法提示 Tips", W / 2, ty);
+  const tips = [
+    "· 攻击或受击都会积攒能量条(血条下方),满格即可释放「大招」。",
+    "· 每种人格拥有独一无二的大招:远程光束 / 治疗 / 反击 / 冲锋 / 旋风…",
+    "· 面向对手按住「防御」可大幅减免伤害。血量归零或时间到血多者胜。",
+    "· 单人模式 P2 由电脑控制;双人模式同一键盘对战(选人界面可切换)。",
+  ];
+  ctx.font = "14px system-ui, sans-serif"; ctx.fillStyle = "#ddd";
+  for (let i = 0; i < tips.length; i++) ctx.fillText(tips[i], W / 2, ty + 24 + i * 22);
+
+  button(ctx, HOWTO_BACK, "返回 Back (Esc)", false);
+  ctx.textAlign = "left";
+}
+
+// ---------- pause menu ----------
+const PAUSE_RESUME = { x: W / 2 - 130, y: 244, w: 260, h: 48 };
+const PAUSE_SETTINGS = { x: W / 2 - 130, y: 302, w: 260, h: 48 };
+const PAUSE_QUIT = { x: W / 2 - 130, y: 360, w: 260, h: 48 };
+export function pauseHit(x, y) {
+  if (inside(PAUSE_RESUME, x, y)) return "resume";
+  if (inside(PAUSE_SETTINGS, x, y)) return "settings";
+  if (inside(PAUSE_QUIT, x, y)) return "quit";
+  return null;
+}
+export function drawPauseMenu(ctx) {
+  ctx.fillStyle = "rgba(0,0,0,0.66)"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#fff";
+  ctx.font = "bold 46px system-ui, sans-serif";
+  ctx.fillText("暂停 PAUSED", W / 2, 190);
+  button(ctx, PAUSE_RESUME, "继续 Resume", true);
+  button(ctx, PAUSE_SETTINGS, "设置 Settings", false);
+  button(ctx, PAUSE_QUIT, "退出到主菜单 Quit", false);
+  ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "14px system-ui, sans-serif";
+  ctx.fillText("Esc / P 继续游戏", W / 2, 438);
+  ctx.textAlign = "left";
+}
+
+// ---------- settings ----------
+const SET_SOUND = { x: W / 2 - 130, y: 250, w: 260, h: 50 };
+const SET_BACK = { x: W / 2 - 130, y: 320, w: 260, h: 44 };
+export function settingsHit(x, y) {
+  if (inside(SET_SOUND, x, y)) return "sound";
+  if (inside(SET_BACK, x, y)) return "back";
+  return null;
+}
+export function drawSettings(ctx, soundOn) {
+  ctx.fillStyle = "rgba(0,0,0,0.74)"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#fff";
+  ctx.font = "bold 40px system-ui, sans-serif";
+  ctx.fillText("设置 SETTINGS", W / 2, 190);
+  button(ctx, SET_SOUND, "音效 Sound: " + (soundOn ? "开 ON" : "关 OFF"), soundOn);
+  button(ctx, SET_BACK, "返回 Back", false);
+  ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "14px system-ui, sans-serif";
+  ctx.fillText("Esc 返回", W / 2, 398);
   ctx.textAlign = "left";
 }
